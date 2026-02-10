@@ -19,6 +19,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from canvas_download.browser import PDFRenderer
+from canvas_download.dedup import deduplicate_pdfs
 from canvas_download.utils import sanitize_filename
 
 # Course sub-paths that we should NOT crawl (not useful content)
@@ -105,14 +106,15 @@ class CanvasScraper:
 
     def scrape_course(
         self, course_id: int, course_dir: Path,
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, int]:
         """Crawl a course's web pages, download files and save pages as PDF.
 
         Uses BFS to walk all links within ``/courses/{course_id}/...``.
         Every HTML page is rendered to PDF via Playwright.
         Actual binary files are downloaded with requests.
+        Near-duplicate PDFs (>= 95% similar text) are removed.
 
-        Returns ``(files_downloaded, pages_saved_as_pdf)``.
+        Returns ``(files_downloaded, pages_saved_as_pdf, duplicates_removed)``.
         """
         prefix = f"/courses/{course_id}"
 
@@ -223,7 +225,13 @@ class CanvasScraper:
         # Render all visited pages as PDFs
         pages_saved = self._save_pages_as_pdf(pdf_pages, course_dir)
 
-        return files_downloaded, pages_saved
+        # Deduplicate near-identical PDFs
+        pages_dir = course_dir / "pages"
+        dupes_removed = 0
+        if pages_dir.exists():
+            dupes_removed = deduplicate_pdfs(pages_dir)
+
+        return files_downloaded, pages_saved, dupes_removed
 
     # -- Internal helpers ---------------------------------------------------
 

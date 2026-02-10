@@ -64,14 +64,14 @@ def main(do_clear: bool) -> None:
     course_dir.mkdir(parents=True, exist_ok=True)
     click.echo(f"\nDownloading to: {course_dir}")
 
-    files_count, pages_count = scraper.scrape_course(course_id, course_dir)
+    files_count, pages_count, dupes_removed = scraper.scrape_course(course_id, course_dir)
 
     # ── Summary ───────────────────────────────────────────────────────────
     click.echo()
     click.echo("━" * 40)
     click.echo(f"  Course : {course_name}")
     click.echo(f"  Files  : {files_count} downloaded")
-    click.echo(f"  Pages  : {pages_count} saved as PDF")
+    click.echo(f"  Pages  : {pages_count} saved as PDF ({dupes_removed} duplicates removed)")
     click.echo(f"  Output : {course_dir}")
     click.echo("━" * 40)
     click.echo("Done!")
