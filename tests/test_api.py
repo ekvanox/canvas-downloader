@@ -88,20 +88,20 @@ class TestCourses:
 
 
 class TestScraperHelpers:
-    def test_looks_like_download(self) -> None:
+    def test_is_download_url(self) -> None:
         """URL patterns that should be detected as file downloads."""
-        assert CanvasScraper._looks_like_download(
+        assert CanvasScraper._is_download_url(
             "/courses/1/files/42/download", "",
         )
-        assert CanvasScraper._looks_like_download(
+        assert CanvasScraper._is_download_url(
             "/courses/1/files/42", "download_frd=1",
         )
-        assert CanvasScraper._looks_like_download(
+        assert CanvasScraper._is_download_url(
             "/courses/1/files/lecture.pdf", "",
         )
-        assert not CanvasScraper._looks_like_download(
+        assert not CanvasScraper._is_download_url(
             "/courses/1/pages/intro", "",
         )
-        assert not CanvasScraper._looks_like_download(
+        assert not CanvasScraper._is_download_url(
             "/courses/1/modules", "",
         )
