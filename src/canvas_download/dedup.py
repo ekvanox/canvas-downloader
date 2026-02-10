@@ -10,7 +10,6 @@ from __future__ import annotations
 from difflib import SequenceMatcher
 from pathlib import Path
 
-import click
 import fitz  # PyMuPDF
 
 
@@ -61,7 +60,7 @@ def deduplicate_pdfs(directory: Path, threshold: float = _SIMILARITY_THRESHOLD) 
     if len(pdf_files) < 2:
         return 0
 
-    click.echo(f"\n  Deduplicating {len(pdf_files)} PDF(s) (threshold: {threshold:.0%})...")
+    print(f"  Deduplicating {len(pdf_files)} PDF(s) (threshold: {threshold:.0%})...")
 
     # Extract text from all PDFs
     texts: dict[Path, str] = {}
@@ -95,7 +94,7 @@ def deduplicate_pdfs(directory: Path, threshold: float = _SIMILARITY_THRESHOLD) 
                 else:
                     victim = pdf_a
 
-                click.echo(
+                print(
                     f"    Removing duplicate: {victim.name} "
                     f"(~{sim:.0%} similar to {(pdf_a if victim == pdf_b else pdf_b).name})"
                 )
@@ -108,8 +107,8 @@ def deduplicate_pdfs(directory: Path, threshold: float = _SIMILARITY_THRESHOLD) 
                     break
 
     if removed_count:
-        click.echo(f"  Dedup: removed {removed_count} duplicate(s).")
+        print(f"  Dedup: removed {removed_count} duplicate(s).")
     else:
-        click.echo("  Dedup: no duplicates found.")
+        print("  Dedup: no duplicates found.")
 
     return removed_count

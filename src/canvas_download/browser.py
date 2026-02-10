@@ -14,42 +14,41 @@ import re
 import time
 from pathlib import Path
 
-import click
 import requests
 from playwright.sync_api import Browser, BrowserContext, Playwright, sync_playwright
 
 STATE_DIR = Path.home() / ".canvas-dl"
 COOKIES_PATH = STATE_DIR / "cookies.json"
-HOSTNAME_PATH = STATE_DIR / "hostname.txt"
-
-
-def load_saved_hostname() -> str | None:
-    """Load the previously saved Canvas hostname."""
-    if HOSTNAME_PATH.exists():
-        hostname = HOSTNAME_PATH.read_text(encoding="utf-8").strip()
-        if hostname:
-            return hostname
-    return None
 
 
 def clear_session() -> None:
-    """Delete saved session data."""
+    """Delete saved session data (cookies and hostname)."""
+    from canvas_download.utils import load_config, save_config
+
     removed = False
-    for path in (COOKIES_PATH, HOSTNAME_PATH):
-        if path.exists():
-            path.unlink()
-            removed = True
+    if COOKIES_PATH.exists():
+        COOKIES_PATH.unlink()
+        removed = True
+
+    config = load_config()
+    if "hostname" in config:
+        del config["hostname"]
+        save_config(config)
+        removed = True
+
     if removed:
-        click.echo(f"Saved session cleared ({STATE_DIR}).")
+        print(f"Saved session cleared ({STATE_DIR}).")
     else:
-        click.echo("No saved session found.")
+        print("No saved session found.")
 
 
 def _save_session(cookies: list, hostname: str) -> None:
     """Persist cookies and hostname for next run."""
+    from canvas_download.utils import save_hostname
+
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     COOKIES_PATH.write_text(json.dumps(cookies, indent=2), encoding="utf-8")
-    HOSTNAME_PATH.write_text(hostname, encoding="utf-8")
+    save_hostname(hostname)
 
 
 def _load_cookies() -> list[dict] | None:
@@ -116,12 +115,12 @@ def create_session(hostname: str) -> tuple[requests.Session, str]:
         session = _build_session(saved, hostname)
         name = _verify_session(session, hostname)
         if name:
-            click.echo(f"  Logged in as: {name}")
+            print(f"  Logged in as: {name}")
             return session, name
-        click.echo("  Saved session expired.")
+        print("  Saved session expired.")
 
     # Need interactive login
-    click.echo("  Opening browser for login...")
+    print("  Opening browser for login...")
     pw = sync_playwright().start()
     try:
         browser = pw.chromium.launch(headless=False)
@@ -131,19 +130,19 @@ def create_session(hostname: str) -> tuple[requests.Session, str]:
         page.goto(f"https://{hostname}")
         page.wait_for_load_state("domcontentloaded")
 
-        click.echo()
-        click.echo("  A browser window has opened.")
-        click.echo("  Please log in to Canvas, then return here.")
-        click.echo("  Waiting for login... (timeout: 5 minutes)")
+        print()
+        print("  A browser window has opened.")
+        print("  Please log in to Canvas, then return here.")
+        print("  Waiting for login... (timeout: 5 minutes)")
 
         for _ in range(300):
             cookies = context.cookies()
             session = _build_session(cookies, hostname)
             name = _verify_session(session, hostname)
             if name:
-                click.echo(f"\n  Logged in as: {name}")
+                print(f"\n  Logged in as: {name}")
                 _save_session(cookies, hostname)
-                click.echo(f"  Session saved to {STATE_DIR}")
+                print(f"  Session saved to {STATE_DIR}")
                 return session, name
             time.sleep(1)
 

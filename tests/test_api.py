@@ -14,8 +14,8 @@ import requests
 from canvas_download.browser import (
     COOKIES_PATH,
     create_session,
-    load_saved_hostname,
 )
+from canvas_download.utils import load_saved_hostname
 from canvas_download.scraper import CanvasScraper
 
 

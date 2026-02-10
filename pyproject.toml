@@ -8,11 +8,12 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "click>=8.0",
     "playwright>=1.40",
     "pymupdf>=1.24",
+    "questionary>=2.0",
     "requests>=2.28",
     "beautifulsoup4>=4.12",
+    "tqdm>=4.66",
 ]
 
 [project.scripts]

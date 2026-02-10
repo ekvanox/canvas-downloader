@@ -14,9 +14,9 @@ from collections import deque
 from pathlib import Path
 from urllib.parse import urljoin, urlparse, unquote
 
-import click
 import requests
 from bs4 import BeautifulSoup
+from tqdm import tqdm
 
 from canvas_download.browser import PDFRenderer
 from canvas_download.dedup import deduplicate_pdfs
@@ -79,29 +79,6 @@ class CanvasScraper:
         result.sort(key=lambda c: c["name"].lower())
         return result
 
-    def select_course(self, courses: list[dict]) -> dict:
-        """Display courses and let the user pick one interactively."""
-        if not courses:
-            click.echo("No courses found.")
-            raise SystemExit(1)
-
-        click.echo(f"\nFound {len(courses)} course(s):\n")
-        for i, c in enumerate(courses, 1):
-            click.echo(f"  {i}. {c['name']}")
-
-        click.echo()
-        while True:
-            raw = click.prompt("Select a course number").strip()
-            try:
-                idx = int(raw)
-                if 1 <= idx <= len(courses):
-                    sel = courses[idx - 1]
-                    click.echo(f"  → {sel['name']}")
-                    return sel
-            except ValueError:
-                pass
-            click.echo(f"  Please enter a number between 1 and {len(courses)}.")
-
     # -- Course scraping ----------------------------------------------------
 
     def scrape_course(
@@ -132,8 +109,7 @@ class CanvasScraper:
         ):
             queue.append(f"{self.base_url}{prefix}{suffix}")
 
-        click.echo("\n  Crawling course pages...")
-        crawl_count = 0
+        crawl_bar = tqdm(desc="Crawling pages", unit="page")
 
         while queue:
             url = queue.popleft()
@@ -168,13 +144,10 @@ class CanvasScraper:
                 continue
 
             # Fetch the page
-            crawl_count += 1
-            if crawl_count % 10 == 0:
-                click.echo(
-                    f"    ...crawled {crawl_count} pages, "
-                    f"found {len(download_urls)} file(s), "
-                    f"{len(pdf_pages)} page(s) so far"
-                )
+            crawl_bar.update(1)
+            crawl_bar.set_postfix(
+                files=len(download_urls), pages=len(pdf_pages),
+            )
 
             try:
                 resp = self.session.get(norm, timeout=30)
@@ -221,9 +194,10 @@ class CanvasScraper:
             # Small delay to be polite to the server
             time.sleep(0.1)
 
-        click.echo(
-            f"    Crawl complete: visited {crawl_count} page(s), "
-            f"found {len(download_urls)} file(s), "
+        crawl_bar.close()
+        print(
+            f"  Crawl complete: {crawl_bar.n} page(s), "
+            f"{len(download_urls)} file(s), "
             f"{len(pdf_pages)} page(s) to save as PDF"
         )
 
@@ -234,8 +208,8 @@ class CanvasScraper:
             if dl_url not in download_urls:
                 download_urls[dl_url] = None
         if api_files:
-            click.echo(
-                f"    File listing: found {len(api_files)} file(s) "
+            print(
+                f"  File listing: {len(api_files)} file(s) "
                 f"({len(download_urls)} total after merge)"
             )
 
@@ -248,8 +222,8 @@ class CanvasScraper:
                 download_urls[dl_url] = None
                 new_from_mods += 1
         if mod_files:
-            click.echo(
-                f"    Modules API: found {len(mod_files)} file(s) "
+            print(
+                f"  Modules API: {len(mod_files)} file(s) "
                 f"({new_from_mods} new)"
             )
 
@@ -342,7 +316,7 @@ class CanvasScraper:
         )
         download_urls: list[str] = []
 
-        click.echo("\n  Fetching file listing...")
+        print("  Fetching file listing...")
 
         try:
             resp = self.session.get(api_url, timeout=30)
@@ -360,7 +334,7 @@ class CanvasScraper:
                             download_urls.append(url)
                     page_url = self._next_link(resp)
                 if download_urls:
-                    click.echo(
+                    print(
                         f"    API returned {len(download_urls)} file(s)"
                     )
                     return download_urls
@@ -368,7 +342,7 @@ class CanvasScraper:
             pass
 
         # --- Attempt 2: Playwright-rendered /files page -------------------
-        click.echo("    API not available, using browser for file listing...")
+        print("    API not available, using browser for file listing...")
         return self._discover_files_via_browser(course_id)
 
     def _discover_files_via_browser(
@@ -458,7 +432,7 @@ class CanvasScraper:
             browser.close()
 
         except Exception as e:
-            click.echo(f"    Browser file listing failed: {e}")
+            print(f"    Browser file listing failed: {e}")
         finally:
             if pw:
                 try:
@@ -467,7 +441,7 @@ class CanvasScraper:
                     pass
 
         if download_urls:
-            click.echo(
+            print(
                 f"    Browser found {len(download_urls)} file(s)"
             )
 
@@ -656,20 +630,18 @@ class CanvasScraper:
         pages_dir = course_dir / "pages"
         pages_dir.mkdir(parents=True, exist_ok=True)
 
-        click.echo(f"\n  Saving {len(pdf_pages)} page(s) as PDF...")
-
         renderer = PDFRenderer(self.hostname)
         try:
             renderer.start()
         except Exception as e:
-            click.echo(f"    Failed to start PDF renderer: {e}")
+            print(f"  Failed to start PDF renderer: {e}")
             return 0
 
         saved = 0
-        total = len(pdf_pages)
         seen_names: set[str] = set()
 
-        for i, (url, title) in enumerate(pdf_pages.items(), 1):
+        bar = tqdm(pdf_pages.items(), desc="Saving pages as PDF", unit="page")
+        for url, title in bar:
             safe_name = sanitize_filename(title)
             # Ensure unique filename
             base_name = safe_name
@@ -680,20 +652,17 @@ class CanvasScraper:
             seen_names.add(safe_name)
 
             dest = pages_dir / f"{safe_name}.pdf"
+            bar.set_postfix_str(safe_name[:40])
+
             if dest.exists():
-                click.echo(f"    [{i}/{total}] Already exists: {safe_name}.pdf")
                 saved += 1
                 continue
 
-            click.echo(f"    [{i}/{total}] {safe_name}.pdf ...", nl=False)
             if renderer.render_pdf(url, dest):
                 saved += 1
-                click.echo(" done")
-            else:
-                click.echo(" FAILED")
 
         renderer.close()
-        click.echo(f"  Pages: {saved}/{total} saved as PDF.")
+        print(f"  Pages: {saved}/{len(pdf_pages)} saved as PDF.")
         return saved
 
     def _download_files(
@@ -710,17 +679,14 @@ class CanvasScraper:
 
         downloaded = 0
         skipped = 0
-        total = len(download_urls)
         seen_names: set[str] = set()
 
-        click.echo(f"\n  Downloading {total} file(s)...")
-
-        for i, url in enumerate(download_urls, 1):
+        bar = tqdm(list(download_urls), desc="Downloading files", unit="file")
+        for url in bar:
             try:
                 resp = self.session.get(url, stream=True, timeout=60)
                 resp.raise_for_status()
-            except Exception as e:
-                click.echo(f"    [{i}/{total}] FAILED: {e}")
+            except Exception:
                 continue
 
             # If we got HTML back, it's not a real file (e.g. a preview page)
@@ -734,7 +700,6 @@ class CanvasScraper:
 
             # Skip video files
             if Path(safe_name).suffix.lower() in _VIDEO_EXTENSIONS:
-                click.echo(f"    [{i}/{total}] Skipping video: {safe_name}")
                 skipped += 1
                 resp.close()
                 continue
@@ -750,24 +715,20 @@ class CanvasScraper:
             # Skip if already downloaded with matching size
             cl = resp.headers.get("Content-Length")
             if dest.exists() and cl and dest.stat().st_size == int(cl):
-                click.echo(f"    [{i}/{total}] Already exists: {safe_name}")
                 skipped += 1
                 resp.close()
                 continue
 
-            click.echo(
-                f"    [{i}/{total}] Downloading {safe_name}...", nl=False,
-            )
+            bar.set_postfix_str(safe_name[:40])
             try:
                 with open(dest, "wb") as f:
                     for chunk in resp.iter_content(64 * 1024):
                         f.write(chunk)
                 downloaded += 1
-                click.echo(" done")
-            except Exception as e:
-                click.echo(f" FAILED: {e}")
+            except Exception:
+                pass
 
-        click.echo(f"  Files: {downloaded} downloaded, {skipped} skipped.")
+        print(f"  Files: {downloaded} downloaded, {skipped} skipped.")
         return downloaded
 
     @staticmethod

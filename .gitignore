@@ -238,3 +238,6 @@ pip-selfcheck.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,macos,venv
+
+# canvas-download config (contains user-specific paths)
+config.toml
