@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Erik Heimdal", email = "63123731+ekvanox@users.noreply.github.com" }
 ]
+license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
     "playwright>=1.40",
