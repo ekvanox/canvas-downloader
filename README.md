@@ -17,6 +17,10 @@ uv run playwright install chromium
 uv run canvas-download
 ```
 
+### Usage Video
+
+<video src="media/usage.mov" controls width="100%" style="max-width: 800px; border-radius: 8px;"></video>
+
 On first run you'll be prompted for:
 
 1. **Canvas hostname** — e.g. `canvas.education.lu.se`
@@ -69,3 +73,7 @@ src/canvas_download/
 ├── scraper.py          # BFS course crawler (requests + BeautifulSoup)
 └── utils.py            # Filename sanitization, path helpers
 ```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
