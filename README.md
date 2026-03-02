@@ -19,7 +19,7 @@ uv run canvas-download
 
 ### Usage Video
 
-<video src="media/usage.mov" controls width="100%" style="max-width: 800px; border-radius: 8px;"></video>
+https://github.com/user-attachments/assets/9463d9ad-a76d-4933-8e5a-695e4e3d55c6
 
 On first run you'll be prompted for:
 
